@@ -42,6 +42,7 @@ const activityUpload = createUpload(
         'image/jpeg', 'image/png', 'image/gif', 'image/webp',
         'image/svg+xml', 'image/bmp', 'image/tiff', 'image/x-icon',
         'application/pdf', 'application/zip',
+        'application/x-zip-compressed',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',

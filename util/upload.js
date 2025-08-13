@@ -27,15 +27,15 @@ function createUpload(allowedTypes, directory = 'uploads/', maxSizeMB = 5) {
     },
     filename: function (req, file, cb) {
       let uniqueName;
-    
-      if (file.mimetype === 'application/zip') {
+
+      if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
         uniqueName = generateCustomId() + '.zip'; // optional: add extension
       } else {
         uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-');
       }
-    
+
       cb(null, uniqueName);
-    }    
+    }
   });
 
   const fileFilter = (req, file, cb) => {
@@ -59,15 +59,15 @@ function createUpload(allowedTypes, directory = 'uploads/', maxSizeMB = 5) {
       const fullPath = path.join(absPath, req.file.filename);
 
       // ✅ Extract if it's a zip
-      if (req.file.mimetype === 'application/zip') {
+      if (req.file.mimetype === 'application/zip' || req.file.mimetype == 'application/x-zip-compressed') {
         const extractFolder = fullPath.replace(/\.zip$/, '');
         fs.mkdirSync(extractFolder, { recursive: true });
         console.log('extractFolder', extractFolder);
         await fs.createReadStream(fullPath)
           .pipe(unzipper.Extract({ path: extractFolder }))
           .promise();
-        req.extractedPath = `${directory}/${req.file.filename.replace(/\.zip$/, '')}`; 
-        console.log('req.extractedPath', req.extractedPath);       
+        req.extractedPath = `${directory}/${req.file.filename.replace(/\.zip$/, '')}`;
+        console.log('req.extractedPath', req.extractedPath);
       }
 
       // ✅ Extract page count if PDF
@@ -77,7 +77,7 @@ function createUpload(allowedTypes, directory = 'uploads/', maxSizeMB = 5) {
         req.pdfPageCount = pdfData.numpages;
       }
 
-      req.uploadDir = `${directory}/${req.file.filename}`; 
+      req.uploadDir = `${directory}/${req.file.filename}`;
       next();
     } catch (err) {
       console.error('File processing error:', err);
