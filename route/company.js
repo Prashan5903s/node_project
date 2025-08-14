@@ -18,6 +18,7 @@ const programController = require('../controller/Company/ProgramControllerAPI')
 const contentFolderController = require('../controller/Company/ContentFolderControllerAPI')
 const moduleController = require('../controller/Company/ModuleController')
 const activityController = require('../controller/Company/ActivityController')
+const programScheduleController = require('../controller/Company/ProgramScheduleController')
 
 const createUpload = require('../util/upload');
 
@@ -171,16 +172,14 @@ router.get('/activity/create/data', isAuth, activityController.getCreateFormAPI)
 router.post('/activity/form/:moduleId/:typeId', isAuth, activityController.postActivityFormAPI)
 router.delete('/activity/delete/:moduleId/:id', isAuth, activityController.deleteActivityAPI)
 router.post('/activity/set-name/:moduleId/:id', isAuth, activityController.setNameActivityAPI)
-router.post(
-    '/activity/data/:moduleId/:moduleTypeId/:id',
-    isAuth,
-    ...activityUpload.middleware('file'), // Handles all types in a single field
-    activityController.postActivityDataAPI
-);
+router.post('/activity/data/:moduleId/:moduleTypeId/:id', isAuth, ...activityUpload.middleware('file'), activityController.postActivityDataAPI);
 
 //This route is for quiz question
 router.get('/quiz/question/:moduleId/:activityId', isAuth, quizAPIController.getQuizOptionAPI)
 router.post('/quiz/question/:moduleId/:activityId', isAuth, quizAPIController.postQuizOptionAPI)
 router.put('/quiz/question/:moduleId/:activityId', isAuth, quizAPIController.putQuizOptionAPI)
+
+//This route is for program schedule
+router.get('/program/schedule/create', isAuth, programScheduleController.getCreateDataAPI)
 
 module.exports = router;
