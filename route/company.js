@@ -180,6 +180,8 @@ router.post('/quiz/question/:moduleId/:activityId', isAuth, quizAPIController.po
 router.put('/quiz/question/:moduleId/:activityId', isAuth, quizAPIController.putQuizOptionAPI)
 
 //This route is for program schedule
+router.get('/program/schedule/data/:contentFolderId', isAuth, programScheduleController.getProgramScheduleAPI)
 router.get('/program/schedule/create', isAuth, programScheduleController.getCreateDataAPI)
+router.post('/program/schedule/:contentFolderId', isAuth, programScheduleController.postProgramScheduleAPI)
 
 module.exports = router;
