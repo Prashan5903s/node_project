@@ -1,4 +1,3 @@
-const mongoose = require('mongoose')
 const programSchedule = require('../../model/ProgramSchedule')
 const department = require('../../model/Department')
 const designation = require('../../model/Designation')
@@ -9,6 +8,7 @@ const contentFolder = require('../../model/ContentFolder')
 const module = require('../../model/Module')
 const Zone = require('../../model/Zone')
 const scheduleUser = require('../../model/ScheduleUser')
+const mongoose = require('mongoose')
 
 const {
     successResponse,
