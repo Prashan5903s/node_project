@@ -21,33 +21,46 @@ exports.getProgramScheduleAPI = async (req, res, next) => {
         const userId = req.userId;
         const { contentFolderId } = req.params;
 
-        // Find ProgramSchedule
+        const Module = await modules.findById(contentFolderId);
+
+        if (!Module) {
+            return errorResponse(res, "Module not found", {}, 404);
+        }
+
+        const ContentFolderId = Module.content_folder_id;
+
         const ProgramSchedule = await programSchedule.findOne({
-            created_by: userId,
             company_id: userId,
-            content_folder_id: contentFolderId
+            content_folder_id: ContentFolderId
         }).lean();
 
         if (!ProgramSchedule) {
             return errorResponse(res, "Program schedule does not exist", {}, 404);
         }
 
-        // Fetch all schedule_user rows for this schedule
         const scheduleUsers = await scheduleUser.find({
             schedule_id: ProgramSchedule._id,
             company_id: userId
         }).lean();
 
-        // Transform scheduleUsers into targetPairs format
-        const targetPairs = scheduleUsers.map(su => ({
-            type: su.type,
-            type_id: su.type_id
+        // 🔑 Normalize into frontend format
+        const grouped = {};
+        scheduleUsers.forEach(su => {
+            if (!grouped[su.type]) grouped[su.type] = [];
+            grouped[su.type].push(String(su.type_id));
+        });
+
+        const targetPairs = Object.entries(grouped).map(([target, options]) => ({
+            target,
+            options
         }));
 
-        // Attach to ProgramSchedule
-        ProgramSchedule.targetPairs = targetPairs;
+        const finalSchedule = {
+            ...ProgramSchedule,
+            targetPairs
+        };
 
-        return successResponse(res, "Setting fetched successfully", ProgramSchedule);
+        return successResponse(res, "Setting fetched successfully", finalSchedule);
     } catch (error) {
         next(error);
     }
