@@ -4,6 +4,9 @@ const department = require('../../model/Department')
 const designation = require('../../model/Designation')
 const group = require('../../model/Group')
 const user = require('../../model/User')
+const activity = require('../../model/Activity')
+const contentFolder = require('../../model/ContentFolder')
+const module = require('../../model/Module')
 const Zone = require('../../model/Zone')
 const scheduleUser = require('../../model/ScheduleUser')
 
@@ -11,6 +14,7 @@ const {
     successResponse,
     errorResponse
 } = require('../../util/response')
+const ContentFolder = require('../../model/ContentFolder')
 
 exports.getProgramScheduleAPI = async (req, res, next) => {
     try {
@@ -105,11 +109,26 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const { contentFolderId } = req.params;
         const userId = req.userId;
 
+        const moduleId = contentFolderId;
+        const Module = await module.findById(contentFolderId)
+
+        const ContentFolderId = Module.content_folder_id;
+
+        const content_folder = await contentFolder.findById(ContentFolderId)
+
+        const programId = content_folder.program_id;
+
+        const Activity = await activity.find({ module_id: moduleId });
+        const activityId = Activity.map(doc => doc._id.toString()); // convert ObjectId → string
+
         //Save/update ProgramSchedule
         let program = await programSchedule.findOne({
             created_by: userId,
-            company_id: userId, // adjust: if you store real company_id separately
-            content_folder_id: contentFolderId
+            company_id: userId,
+            module_id: moduleId,
+            content_folder_id: ContentFolderId,
+            program_id: programId,
+            activity_id: activityId
         });
 
         if (!program) {
@@ -120,7 +139,10 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
                 pushEnrollmentSetting,
                 selfEnrollmentSetting,
                 dueType,
-                content_folder_id: contentFolderId,
+                module_id: moduleId,
+                content_folder_id: ContentFolderId,
+                program_id: programId,
+                activity_id: activityId,
                 company_id: userId,
                 created_by: userId
             });
@@ -131,6 +153,10 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
             program.pushEnrollmentSetting = pushEnrollmentSetting;
             program.selfEnrollmentSetting = selfEnrollmentSetting;
             program.dueType = dueType;
+            program.module_id = moduleId;
+            program.content_folder_id = ContentFolderId;
+            program.program_id = programId;
+            program.activity_id = activityId;
             program.updated_at = new Date();
         }
 
