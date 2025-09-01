@@ -22,6 +22,7 @@ const scheduleUserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId, // ID of designation/department/group/region/user
         required: true,
     },
+    user_group_id: [{ type: mongoose.Schema.Types.ObjectId, required: false }],
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: null }
 }, { collection: "schedule_users" });

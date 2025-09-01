@@ -21,6 +21,7 @@ exports.getProgramScheduleAPI = async (req, res, next) => {
         const userId = req.userId;
         const { contentFolderId } = req.params;
 
+        // Find ProgramSchedule
         const ProgramSchedule = await programSchedule.findOne({
             created_by: userId,
             company_id: userId,
@@ -31,27 +32,19 @@ exports.getProgramScheduleAPI = async (req, res, next) => {
             return errorResponse(res, "Program schedule does not exist", {}, 404);
         }
 
+        // Fetch all schedule_user rows for this schedule
         const scheduleUsers = await scheduleUser.find({
             schedule_id: ProgramSchedule._id,
             company_id: userId
         }).lean();
 
-        // ✅ Transform correctly
-        const targetPairs = [];
-        const grouped = {};
+        // Transform scheduleUsers into targetPairs format
+        const targetPairs = scheduleUsers.map(su => ({
+            type: su.type,
+            type_id: su.type_id
+        }));
 
-        scheduleUsers.forEach((su) => {
-            if (!grouped[su.type]) grouped[su.type] = [];
-            grouped[su.type].push(su.type_id.toString());
-        });
-
-        Object.keys(grouped).forEach((type) => {
-            targetPairs.push({
-                target: type,          // "1", "2", "3", "4", "5"
-                options: grouped[type] // always array
-            });
-        });
-
+        // Attach to ProgramSchedule
         ProgramSchedule.targetPairs = targetPairs;
 
         return successResponse(res, "Setting fetched successfully", ProgramSchedule);
@@ -95,7 +88,9 @@ exports.getCreateDataAPI = async (req, res, next) => {
 }
 
 exports.postProgramScheduleAPI = async (req, res, next) => {
+
     try {
+
         const {
             dueDate,
             dueDays,
@@ -111,6 +106,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
 
         // Step 1: Resolve module, contentFolder, program
         const Module = await modules.findById(contentFolderId);
+
         if (!Module) {
             return errorResponse(res, "Module not found", {}, 404);
         }
