@@ -1,4 +1,5 @@
 const mongoose = require('mongoose')
+
 const programSchedule = require('../../model/ProgramSchedule')
 const department = require('../../model/Department')
 const designation = require('../../model/Designation')
@@ -6,7 +7,7 @@ const group = require('../../model/Group')
 const user = require('../../model/User')
 const activity = require('../../model/Activity')
 const contentFolder = require('../../model/ContentFolder')
-const module = require('../../model/Module')
+const modules = require('../../model/Module')
 const Zone = require('../../model/Zone')
 const scheduleUser = require('../../model/ScheduleUser')
 
@@ -14,7 +15,6 @@ const {
     successResponse,
     errorResponse
 } = require('../../util/response')
-const ContentFolder = require('../../model/ContentFolder')
 
 exports.getProgramScheduleAPI = async (req, res, next) => {
     try {
@@ -109,54 +109,67 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const { contentFolderId } = req.params;
         const userId = req.userId;
 
-        const moduleId = contentFolderId;
-        const Module = await module.findById(contentFolderId)
+        // Step 1: Resolve module, contentFolder, program
+        const Module = await modules.findById(contentFolderId);
+        if (!Module) {
+            return errorResponse(res, "Module not found", {}, 404);
+        }
 
         const ContentFolderId = Module.content_folder_id;
-
-        const content_folder = await contentFolder.findById(ContentFolderId)
+        const content_folder = await contentFolder.findById(ContentFolderId);
+        if (!content_folder) {
+            return errorResponse(res, "Content folder not found", {}, 404);
+        }
 
         const programId = content_folder.program_id;
 
-        const Activity = await activity.find({ module_id: moduleId });
-const activityId = Activity.map(doc => doc._id.toString()); // convert ObjectId → string
+        const Activity = await activity.find({ module_id: Module._id }).select("_id");
+        const activityIds = Activity.map(doc => doc._id); // keep as ObjectIds
 
-        //Save/update ProgramSchedule
+        // Step 2: Create or update ProgramSchedule
         let program = await programSchedule.findOne({
             created_by: userId,
             company_id: userId,
-            module_id: moduleId,
+            module_id: Module._id,
             content_folder_id: ContentFolderId,
             program_id: programId,
-            activity_id
         });
 
         if (!program) {
             program = new programSchedule({
                 lockModule,
-                dueDate: dueType === "fixed" ? dueDate : null,
+                dueDate: dueType === "fixed" && dueDate ? new Date(dueDate) : null,
                 dueDays: dueType === "relative" ? dueDays : null,
                 pushEnrollmentSetting,
                 selfEnrollmentSetting,
                 dueType,
-                content_folder_id: contentFolderId,
+                module_id: Module._id,
+                content_folder_id: ContentFolderId,
+                program_id: programId,
+                activity_id: activityIds,
                 company_id: userId,
-                created_by: userId
+                created_by: userId,
+                created_at: new Date(),
+                updated_at: new Date()
             });
         } else {
             program.lockModule = lockModule;
-            program.dueDate = dueType === "fixed" ? dueDate : null;
+            program.dueDate = dueType === "fixed" && dueDate ? new Date(dueDate) : null;
             program.dueDays = dueType === "relative" ? dueDays : null;
             program.pushEnrollmentSetting = pushEnrollmentSetting;
             program.selfEnrollmentSetting = selfEnrollmentSetting;
             program.dueType = dueType;
+            program.module_id = Module._id;
+            program.content_folder_id = ContentFolderId;
+            program.program_id = programId;
+            program.activity_id = activityIds;
             program.updated_at = new Date();
         }
 
         await program.save();
 
-        // Step 2: Manage schedule_users
-        await scheduleUser.deleteMany({ schedule_id: program._id });
+        // Step 3: Manage schedule_users
+        await scheduleUser.deleteMany({ schedule_id: program._id, company_id: userId });
 
         if (Array.isArray(targetPairs)) {
             const bulk = [];
@@ -165,10 +178,12 @@ const activityId = Activity.map(doc => doc._id.toString()); // convert ObjectId 
                 if (pair.target && Array.isArray(pair.options)) {
                     pair.options.forEach(optionId => {
                         bulk.push({
-                            company_id: userId,  // or req.companyId if available
+                            company_id: userId,
                             schedule_id: program._id,
                             type: pair.target,
-                            type_id: optionId
+                            type_id: mongoose.Types.ObjectId.isValid(optionId)
+                                ? new mongoose.Types.ObjectId(optionId)
+                                : optionId
                         });
                     });
                 }
@@ -180,9 +195,8 @@ const activityId = Activity.map(doc => doc._id.toString()); // convert ObjectId 
         }
 
         return successResponse(res, "Settings data saved successfully");
-
     } catch (error) {
+        console.error("Error in postProgramScheduleAPI:", error);
         next(error);
     }
 };
-
