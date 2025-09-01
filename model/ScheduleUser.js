@@ -2,32 +2,29 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 
-const scheduleUserSchema = new Schema({
+const scheduleUserSchema = new mongoose.Schema({
     company_id: {
-        type: mongoose.Schema.Types.ObjectId, // BIGINT
-        required: true, // company_id is required
-        ref: 'users', // Reference to 'companies' collection
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: "companies"
     },
     schedule_id: {
-        type: mongoose.Schema.Types.ObjectId, // BIGINT
-        required: true, // schedule_id is required
-        ref: 'schedules', // Reference to 'schedules' collection
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: "program_schedules"
     },
     type: {
-        type: String, // VARCHAR(255)
-        maxlength: 255, // Limit length to 255 characters
-        required: true, // type is required
+        type: String,
+        maxlength: 1, // "1"=Designation, "2"=Department, "3"=Group, "4"=Region, "5"=User
+        required: true,
     },
     type_id: {
-        type: mongoose.Schema.Types.ObjectId, // BIGINT
-        required: true, // type_id is required
-        ref: "users"
+        type: mongoose.Schema.Types.ObjectId, // ID of designation/department/group/region/user
+        required: true,
     },
-    created_at: {
-        type: Date, // TIMESTAMP
-        required: true, // created_at is required
-        default: Date.now, // Default to current date/time
-    },
-});
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: null }
+}, { collection: "schedule_users" });
 
-module.exports = mongoose.model('schedule_user', scheduleUserSchema); // Model name 'ScheduleUser'
+
+module.exports = mongoose.model('schedule_user', scheduleUserSchema);

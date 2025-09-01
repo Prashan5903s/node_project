@@ -1,31 +1,60 @@
+const mongoose = require('mongoose')
 const programSchedule = require('../../model/ProgramSchedule')
 const department = require('../../model/Department')
 const designation = require('../../model/Designation')
 const group = require('../../model/Group')
 const user = require('../../model/User')
 const Zone = require('../../model/Zone')
-const mongoose = require('mongoose')
-const { successResponse, errorResponse } = require('../../util/response')
+const scheduleUser = require('../../model/ScheduleUser')
+
+const {
+    successResponse,
+    errorResponse
+} = require('../../util/response')
 
 exports.getProgramScheduleAPI = async (req, res, next) => {
     try {
-
         const userId = req.userId;
-
         const { contentFolderId } = req.params;
 
-        const ProgramSchedule = await programSchedule.findOne({ created_by: userId, company_id: userId, content_folder_id: contentFolderId })
+        const ProgramSchedule = await programSchedule.findOne({
+            created_by: userId,
+            company_id: userId,
+            content_folder_id: contentFolderId
+        }).lean();
 
         if (!ProgramSchedule) {
-            return errorResponse(res, "Program schedule does not exist", {}, 404)
+            return errorResponse(res, "Program schedule does not exist", {}, 404);
         }
 
-        return successResponse(res, "Setting fetched successfully", ProgramSchedule)
+        const scheduleUsers = await scheduleUser.find({
+            schedule_id: ProgramSchedule._id,
+            company_id: userId
+        }).lean();
 
+        // ✅ Transform correctly
+        const targetPairs = [];
+        const grouped = {};
+
+        scheduleUsers.forEach((su) => {
+            if (!grouped[su.type]) grouped[su.type] = [];
+            grouped[su.type].push(su.type_id.toString());
+        });
+
+        Object.keys(grouped).forEach((type) => {
+            targetPairs.push({
+                target: type,          // "1", "2", "3", "4", "5"
+                options: grouped[type] // always array
+            });
+        });
+
+        ProgramSchedule.targetPairs = targetPairs;
+
+        return successResponse(res, "Setting fetched successfully", ProgramSchedule);
     } catch (error) {
-        next(error)
+        next(error);
     }
-}
+};
 
 exports.getCreateDataAPI = async (req, res, next) => {
     try {
@@ -76,57 +105,63 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const { contentFolderId } = req.params;
         const userId = req.userId;
 
-        const ProgramSchedule = await programSchedule.findOne({ created_by: userId, company_id: userId, content_folder_id: contentFolderId })
+        //Save/update ProgramSchedule
+        let program = await programSchedule.findOne({
+            created_by: userId,
+            company_id: userId, // adjust: if you store real company_id separately
+            content_folder_id: contentFolderId
+        });
 
-        if (!ProgramSchedule) {
-
-            // Validation: Ensure correct field is present based on dueType
-            if (dueType === "fixed" && !dueDate) {
-                return res.status(400).json({ status: "Failure", message: "dueDate is required for fixed dueType" });
-            }
-            if (dueType === "relative" && !dueDays) {
-                return res.status(400).json({ status: "Failure", message: "dueDays is required for relative dueType" });
-            }
-
-            const ProgramSchedule = new programSchedule({
+        if (!program) {
+            program = new programSchedule({
                 lockModule,
                 dueDate: dueType === "fixed" ? dueDate : null,
                 dueDays: dueType === "relative" ? dueDays : null,
                 pushEnrollmentSetting,
                 selfEnrollmentSetting,
-                targetPairs: targetPairs && targetPairs.length ? targetPairs : [],
                 dueType,
                 content_folder_id: contentFolderId,
                 company_id: userId,
                 created_by: userId
             });
-
-            await ProgramSchedule.save();
-
         } else {
+            program.lockModule = lockModule;
+            program.dueDate = dueType === "fixed" ? dueDate : null;
+            program.dueDays = dueType === "relative" ? dueDays : null;
+            program.pushEnrollmentSetting = pushEnrollmentSetting;
+            program.selfEnrollmentSetting = selfEnrollmentSetting;
+            program.dueType = dueType;
+            program.updated_at = new Date();
+        }
 
-            if (dueType === "fixed" && !dueDate) {
-                return res.status(400).json({ status: "Failure", message: "dueDate is required for fixed dueType" });
-            }
-            if (dueType === "relative" && !dueDays) {
-                return res.status(400).json({ status: "Failure", message: "dueDays is required for relative dueType" });
-            }
+        await program.save();
 
-            await programSchedule.findOneAndUpdate({ created_by: userId, company_id: userId, content_folder_id: contentFolderId }, {
-                lockModule,
-                dueDate: dueType === "fixed" ? dueDate : null,
-                dueDays: dueType === "relative" ? dueDays : null,
-                pushEnrollmentSetting,
-                selfEnrollmentSetting,
-                targetPairs: targetPairs && targetPairs.length ? targetPairs : [],
-                dueType,
-                content_folder_id: contentFolderId,
-                company_id: userId,
-                created_by: userId
-            })
+        // Step 2: Manage schedule_users
+        await scheduleUser.deleteMany({ schedule_id: program._id });
+
+        if (Array.isArray(targetPairs)) {
+            const bulk = [];
+
+            targetPairs.forEach(pair => {
+                if (pair.target && Array.isArray(pair.options)) {
+                    pair.options.forEach(optionId => {
+                        bulk.push({
+                            company_id: userId,  // or req.companyId if available
+                            schedule_id: program._id,
+                            type: pair.target,
+                            type_id: optionId
+                        });
+                    });
+                }
+            });
+
+            if (bulk.length > 0) {
+                await scheduleUser.insertMany(bulk);
+            }
         }
 
         return successResponse(res, "Settings data saved successfully");
+
     } catch (error) {
         next(error);
     }
