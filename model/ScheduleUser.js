@@ -7,6 +7,10 @@ const scheduleUserSchema = new Schema({
         type: mongoose.Schema.Types.ObjectId,
         required: true,
     },
+    schedule_type: {
+        type: Number,
+        required: true
+    },
     schedule_type_id: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,

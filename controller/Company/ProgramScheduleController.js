@@ -102,9 +102,7 @@ exports.getCreateDataAPI = async (req, res, next) => {
 }
 
 exports.postProgramScheduleAPI = async (req, res, next) => {
-
     try {
-
         const {
             dueDate,
             dueDays,
@@ -118,7 +116,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const { contentFolderId } = req.params;
         const userId = req.userId;
 
-        // Step 1: Resolve module, contentFolder, program
+        // Resolve module, contentFolder, program
         const Module = await modules.findById(contentFolderId);
 
         if (!Module) {
@@ -127,6 +125,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
 
         const ContentFolderId = Module.content_folder_id;
         const content_folder = await contentFolder.findById(ContentFolderId);
+
         if (!content_folder) {
             return errorResponse(res, "Content folder not found", {}, 404);
         }
@@ -134,7 +133,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const programId = content_folder.program_id;
 
         const Activity = await activity.find({ module_id: Module._id }).select("_id");
-        const activityIds = Activity.map(doc => doc._id); // keep as ObjectIds
+        const activityIds = Activity.map(doc => doc._id);
 
         // Create or update ProgramSchedule
         let program = await programSchedule.findOne({
@@ -146,7 +145,6 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         });
 
         if (!program) {
-
             program = new programSchedule({
                 lockModule,
                 dueDate: dueType === "fixed" && dueDate ? new Date(dueDate) : null,
@@ -163,9 +161,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
                 created_at: new Date(),
                 updated_at: new Date()
             });
-
         } else {
-
             program.lockModule = lockModule;
             program.dueDate = dueType === "fixed" && dueDate ? new Date(dueDate) : null;
             program.dueDays = dueType === "relative" ? dueDays : null;
@@ -177,74 +173,84 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
             program.program_id = programId;
             program.activity_id = activityIds;
             program.updated_at = new Date();
-
         }
 
         await program.save();
 
-        // Step 3: Manage schedule_users
+        // Manage schedule_types
         await scheduleType.deleteMany({ schedule_id: program._id, company_id: userId });
 
         if (Array.isArray(targetPairs)) {
-
-            const bulk = [];
-
-            const targetUser = []
+            const bulkTypes = [];
 
             targetPairs.forEach(pair => {
-
                 if (pair.target && Array.isArray(pair.options)) {
-
                     pair.options.forEach(optionId => {
-
-                        const type = pair.target;
-
-                        bulk.push({
+                        bulkTypes.push({
                             company_id: userId,
                             schedule_id: program._id,
-                            type: type,
+                            type: pair.target,
                             type_id: mongoose.Types.ObjectId.isValid(optionId)
                                 ? new mongoose.Types.ObjectId(optionId)
                                 : optionId
                         });
-
                     });
-
                 }
-
             });
 
-            if (bulk.length > 0) {
-                await scheduleType.insertMany(bulk);
+            if (bulkTypes.length > 0) {
+                await scheduleType.insertMany(bulkTypes);
             }
 
-            const schedule_type = await scheduleType.find({ company_id: userId, schedule_id: program._id })
+            // Create schedule_users
+            await scheduleUser.deleteMany({ schedule_id: program._id, company_id: userId });
 
-            if (schedule_type && (schedule_type.length) > 0) {
-                schedule_type.forEach(item => {
+            const schedule_type = await scheduleType.find({
+                company_id: userId,
+                schedule_id: program._id
+            });
 
+            const bulkUsers = [];
+
+            if (schedule_type && schedule_type.length > 0) {
+                for (const item of schedule_type) {
                     const type = item.type;
                     const typeId = item.type_id;
+                    const scheduleId = item.schedule_id;
 
-                    console.log("Type", type, typeId)
+                    let ids = [];
 
                     if (type == 1) {
-
-                        // const 
-
+                        const userDesignation = await user.find({ designation_id: typeId }).select('_id');
+                        ids = userDesignation.map(u => u._id);
                     } else if (type == 2) {
-
+                        const userDepartment = await user.find({ department_id: typeId }).select('_id');
+                        ids = userDepartment.map(u => u._id);
                     } else if (type == 3) {
-
+                        const userGroup = await group.find({ _id: typeId }).select('_id');
+                        ids = userGroup.map(g => g._id);
                     } else if (type == 4) {
-
-                    } else if (type == 5) {
-
+                        const userRegion = await user.find({ region_id: typeId }).select('_id');
+                        ids = userRegion.map(u => u._id);
                     }
 
-                })
-            }
+                    if (ids.length > 0) {
+                        ids.forEach(uid => {
+                            bulkUsers.push({
+                                schedule_type: type, // ✅ saving type also
+                                schedule_id: scheduleId,
+                                schedule_type_id: typeId,
+                                company_id: userId,
+                                user_id: uid
+                            });
+                        });
+                    }
+                }
 
+                if (bulkUsers.length > 0) {
+                    await scheduleUser.insertMany(bulkUsers);
+                }
+            }
         }
 
         return successResponse(res, "Settings data saved successfully");
