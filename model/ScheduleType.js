@@ -2,12 +2,8 @@ const mongoose = require('mongoose');
 
 const Schema = mongoose.Schema;
 
-const scheduleUserSchema = new Schema({
+const scheduleTypeSchema = new Schema({
     company_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        required: true,
-    },
-    schedule_type_id: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
         ref: "companies"
@@ -17,7 +13,12 @@ const scheduleUserSchema = new Schema({
         required: true,
         ref: "program_schedules"
     },
-    user_id: {
+    type: {
+        type: String,
+        maxlength: 1, // "1"=Designation, "2"=Department, "3"=Group, "4"=Region, "5"=User
+        required: true,
+    },
+    type_id: {
         type: mongoose.Schema.Types.ObjectId, // ID of designation/department/group/region/user
         required: true,
     },
@@ -29,7 +30,7 @@ const scheduleUserSchema = new Schema({
         type: Date,
         default: null
     }
-}, { collection: "schedule_users" });
+}, { collection: "schedule_type" });
 
 
-module.exports = mongoose.model('schedule_user', scheduleUserSchema);
+module.exports = mongoose.model('schedule_type', scheduleTypeSchema);

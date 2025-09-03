@@ -6,17 +6,17 @@ const {
     hash,
     normalizeEmail,
     normalizePhone
-  } = require('../util/encryption');
+} = require('../util/encryption');
 
 const UserCodeSchema = new mongoose.Schema({
     code: {
-      type: String,
-      required: true,
-      unique: false // unique across users? handled manually
+        type: String,
+        required: true,
+        unique: false // unique across users? handled manually
     },
     issued_on: Date, // Optional: date when it was issued
     type: String      // Optional: internal, external, etc.
-  }, { _id: true }); // Avoids creating _id for sub-docs
+}, { _id: true }); // Avoids creating _id for sub-docs
 
 const userSchema = new Schema({
     company_id: {
@@ -175,6 +175,21 @@ const userSchema = new Schema({
         ref: "zones",
         set: v => (v === '' ? undefined : v)
     },
+    region_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "zones",
+        set: v => (v === '' ? undefined : v)
+    },
+    branch_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "zones",
+        set: v => (v === '' ? undefined : v)
+    },
+    department_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "zones",
+        set: v => (v === '' ? undefined : v)
+    },
     dob: {
         type: Date,
         required: false,
@@ -219,7 +234,7 @@ userSchema.virtual('roles', {
     localField: '_id',
     foreignField: 'user_id',
     justOne: false
-  });
+});
 
 userSchema.set('toJSON', { virtuals: true, getters: true });
 userSchema.set('toObject', { virtuals: true, getters: true });

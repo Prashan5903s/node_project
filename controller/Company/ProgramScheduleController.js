@@ -9,6 +9,7 @@ const activity = require('../../model/Activity')
 const contentFolder = require('../../model/ContentFolder')
 const modules = require('../../model/Module')
 const Zone = require('../../model/Zone')
+const scheduleType = require('../../model/ScheduleType')
 const scheduleUser = require('../../model/ScheduleUser')
 
 const {
@@ -38,14 +39,14 @@ exports.getProgramScheduleAPI = async (req, res, next) => {
             return errorResponse(res, "Program schedule does not exist", {}, 404);
         }
 
-        const scheduleUsers = await scheduleUser.find({
+        const scheduleTypes = await scheduleType.find({
             schedule_id: ProgramSchedule._id,
             company_id: userId
         }).lean();
 
         // 🔑 Normalize into frontend format
         const grouped = {};
-        scheduleUsers.forEach(su => {
+        scheduleTypes.forEach(su => {
             if (!grouped[su.type]) grouped[su.type] = [];
             grouped[su.type].push(String(su.type_id));
         });
@@ -135,7 +136,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         const Activity = await activity.find({ module_id: Module._id }).select("_id");
         const activityIds = Activity.map(doc => doc._id); // keep as ObjectIds
 
-        // Step 2: Create or update ProgramSchedule
+        // Create or update ProgramSchedule
         let program = await programSchedule.findOne({
             created_by: userId,
             company_id: userId,
@@ -145,6 +146,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         });
 
         if (!program) {
+
             program = new programSchedule({
                 lockModule,
                 dueDate: dueType === "fixed" && dueDate ? new Date(dueDate) : null,
@@ -161,7 +163,9 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
                 created_at: new Date(),
                 updated_at: new Date()
             });
+
         } else {
+
             program.lockModule = lockModule;
             program.dueDate = dueType === "fixed" && dueDate ? new Date(dueDate) : null;
             program.dueDays = dueType === "relative" ? dueDays : null;
@@ -173,34 +177,74 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
             program.program_id = programId;
             program.activity_id = activityIds;
             program.updated_at = new Date();
+
         }
 
         await program.save();
 
         // Step 3: Manage schedule_users
-        await scheduleUser.deleteMany({ schedule_id: program._id, company_id: userId });
+        await scheduleType.deleteMany({ schedule_id: program._id, company_id: userId });
 
         if (Array.isArray(targetPairs)) {
+
             const bulk = [];
 
+            const targetUser = []
+
             targetPairs.forEach(pair => {
+
                 if (pair.target && Array.isArray(pair.options)) {
+
                     pair.options.forEach(optionId => {
+
+                        const type = pair.target;
+
                         bulk.push({
                             company_id: userId,
                             schedule_id: program._id,
-                            type: pair.target,
+                            type: type,
                             type_id: mongoose.Types.ObjectId.isValid(optionId)
                                 ? new mongoose.Types.ObjectId(optionId)
                                 : optionId
                         });
+
                     });
+
                 }
+
             });
 
             if (bulk.length > 0) {
-                await scheduleUser.insertMany(bulk);
+                await scheduleType.insertMany(bulk);
             }
+
+            const schedule_type = await scheduleType.find({ company_id: userId, schedule_id: program._id })
+
+            if (schedule_type && (schedule_type.length) > 0) {
+                schedule_type.forEach(item => {
+
+                    const type = item.type;
+                    const typeId = item.type_id;
+
+                    console.log("Type", type, typeId)
+
+                    if (type == 1) {
+
+                        // const 
+
+                    } else if (type == 2) {
+
+                    } else if (type == 3) {
+
+                    } else if (type == 4) {
+
+                    } else if (type == 5) {
+
+                    }
+
+                })
+            }
+
         }
 
         return successResponse(res, "Settings data saved successfully");

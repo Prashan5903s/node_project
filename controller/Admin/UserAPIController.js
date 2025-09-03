@@ -38,20 +38,20 @@ exports.createUserAPI = async (req, res, next) => {
             : '';
 
         const allowedFields = [
-            'first_name','first_name_search', 'last_name', 'email', 'country_id', 'state_id',
-            'city_id', 'address', 'status', 'phone', 'dob', 'website',
-            'pincode', 'designation_id', 'urn_no', 'idfa_code',
-            'application_no', 'licence_no', 'zone_id','employee_type','participation_type_id'
+            'first_name', 'first_name_search', 'last_name', 'email', 'country_id', 'state_id',
+            'city_id', 'address', 'status', 'phone', 'dob', 'website', "region_id", "branch_id",
+            'pincode', 'designation_id', 'urn_no', 'idfa_code', "department_id",
+            'application_no', 'licence_no', 'zone_id', 'employee_type', 'participation_type_id'
         ];
 
         const existingUserEmail = await User.findOne({ email_hash: hash(normalizeEmail(req.body.email)), company_id: userId });
         if (existingUserEmail) {
-            return errorResponse(res,'This email already been taken!',{}, 400);
+            return errorResponse(res, 'This email already been taken!', {}, 400);
         }
 
         const existingUserPhone = await User.findOne({ phone_hash: hash(normalizePhone(req.body.phone)), company_id: userId });
         if (existingUserPhone) {
-            return errorResponse(res,'This phone already been taken!',{}, 400);
+            return errorResponse(res, 'This phone already been taken!', {}, 400);
         }
 
         const userData = pick(req.body, allowedFields);
@@ -65,9 +65,9 @@ exports.createUserAPI = async (req, res, next) => {
                 userId: null,         // No userId yet since new user
                 existingUser: null
             });
-            
+
             if (!result.success) {
-                return errorResponse(res,result.message,{}, 400);
+                return errorResponse(res, result.message, {}, 400);
             }
 
             processedCodes = result.codes;
@@ -88,10 +88,10 @@ exports.createUserAPI = async (req, res, next) => {
 
         // Handle roles from request
         const roles = Array.isArray(req.body.roles)
-        ? req.body.roles
-        : typeof req.body.roles === 'string'
-        ? req.body.roles.split(',').map(role => role.trim())
-        : [];
+            ? req.body.roles
+            : typeof req.body.roles === 'string'
+                ? req.body.roles.split(',').map(role => role.trim())
+                : [];
 
         const roleDocs = await Role.find({ _id: { $in: roles } });
 
@@ -112,75 +112,75 @@ exports.createUserAPI = async (req, res, next) => {
 const processEmployeeCodesForUser = async ({ rawCodes, userId, existingUser = null }) => {
     let parsedCodes = [];
     try {
-      parsedCodes = rawCodes;
-      if (!Array.isArray(parsedCodes)) {
-        parsedCodes = [parsedCodes];
-      }
+        parsedCodes = rawCodes;
+        if (!Array.isArray(parsedCodes)) {
+            parsedCodes = [parsedCodes];
+        }
     } catch {
-      return { success: true, codes: existingUser?.codes || [] };
-    }
-  
-    if (parsedCodes.length === 0) {
-      return { success: true, codes: existingUser?.codes || [] };
+        return { success: true, codes: existingUser?.codes || [] };
     }
 
-  
+    if (parsedCodes.length === 0) {
+        return { success: true, codes: existingUser?.codes || [] };
+    }
+
+
     const normalizedCodes = parsedCodes
-      .map(code => (code != null ? String(code).trim() : ''))
-      .filter(Boolean);
+        .map(code => (code != null ? String(code).trim() : ''))
+        .filter(Boolean);
 
     const duplicateUsers = await User.find({
-     // _id: { $ne: userId },
-      'codes.code': { $in: normalizedCodes }
+        // _id: { $ne: userId },
+        'codes.code': { $in: normalizedCodes }
     }).select('codes');
-  
+
     const foundCodes = new Set();
     for (const user of duplicateUsers) {
-      user.codes.forEach(c => {
-        const codeLower = c.code;
-        if (normalizedCodes.includes(codeLower)) {
-          foundCodes.add(codeLower);
-        }
-      });
+        user.codes.forEach(c => {
+            const codeLower = c.code;
+            if (normalizedCodes.includes(codeLower)) {
+                foundCodes.add(codeLower);
+            }
+        });
     }
     if (foundCodes.size > 0) {
-      return {
-        success: false,
-        message: 'Duplicate employee ID(s) found in other users.',
-        duplicates: Array.from(foundCodes)
-      };
+        return {
+            success: false,
+            message: 'Duplicate employee ID(s) found in other users.',
+            duplicates: Array.from(foundCodes)
+        };
     }
-  
+
     // Map existing codes for quick lookup
     const existingCodesMap = new Map(
-      (existingUser?.codes || []).map(c => [c.code.toLowerCase(), c])
+        (existingUser?.codes || []).map(c => [c.code.toLowerCase(), c])
     );
-  
+
     // Mark all existing codes inactive
     const updatedExistingCodes = (existingUser?.codes || []).map(codeObj => ({
-      ...codeObj.toObject ? codeObj.toObject() : codeObj, // convert mongoose doc to plain object if needed
-      type: 'inactive',
+        ...codeObj.toObject ? codeObj.toObject() : codeObj, // convert mongoose doc to plain object if needed
+        type: 'inactive',
     }));
-  
+
     // Add new codes as active only if they don't already exist
     for (const code of normalizedCodes) {
-      if (!existingCodesMap.has(code)) {
-        updatedExistingCodes.push({
-          code,
-          issued_on: new Date(),
-          type: 'active',
-        });
-      } else {
-        // If code exists, mark it active (override inactive)
-        const index = updatedExistingCodes.findIndex(c => c.code.toLowerCase() === code);
-        if (index !== -1) {
-          updatedExistingCodes[index].type = 'active';
+        if (!existingCodesMap.has(code)) {
+            updatedExistingCodes.push({
+                code,
+                issued_on: new Date(),
+                type: 'active',
+            });
+        } else {
+            // If code exists, mark it active (override inactive)
+            const index = updatedExistingCodes.findIndex(c => c.code.toLowerCase() === code);
+            if (index !== -1) {
+                updatedExistingCodes[index].type = 'active';
+            }
         }
-      }
     }
-  
+
     return { success: true, codes: updatedExistingCodes };
-  };
+};
 
 exports.updateUserAPI = async (req, res, next) => {
     try {
@@ -193,24 +193,24 @@ exports.updateUserAPI = async (req, res, next) => {
             return errorResponse(res, "User not found", 404);
         }
 
-        const existingUserEmail = await User.findOne({ 
-            email_hash: hash(normalizeEmail(req.body.email)), 
+        const existingUserEmail = await User.findOne({
+            email_hash: hash(normalizeEmail(req.body.email)),
             company_id: currentUser,
             _id: { $ne: userId }
         });
 
         if (existingUserEmail) {
-            return errorResponse(res,'This email already been taken!',{}, 400);
+            return errorResponse(res, 'This email already been taken!', {}, 400);
         }
 
-        const existingUserPhone = await User.findOne({ 
-            email_hash: hash(normalizePhone(req.body.phone)), 
+        const existingUserPhone = await User.findOne({
+            email_hash: hash(normalizePhone(req.body.phone)),
             company_id: currentUser,
             _id: { $ne: userId }
         });
 
         if (existingUserPhone) {
-            return errorResponse(res,'This phone already been taken!',{}, 400);
+            return errorResponse(res, 'This phone already been taken!', {}, 400);
         }
 
         const imageUrl = req.file?.filename
@@ -221,7 +221,8 @@ exports.updateUserAPI = async (req, res, next) => {
             'first_name', 'last_name', 'email', 'country_id', 'state_id',
             'city_id', 'address', 'status', 'phone', 'dob', 'website',
             'pincode', 'designation_id', 'urn_no', 'idfa_code',
-            'application_no', 'licence_no', 'zone_id','employee_type','participation_type_id'
+            "region_id", "branch_id", "department_id", "zone_id",
+            'application_no', 'licence_no', 'zone_id', 'employee_type', 'participation_type_id'
         ];
 
         const updateData = pick(req.body, allowedFields);
@@ -238,12 +239,12 @@ exports.updateUserAPI = async (req, res, next) => {
                 userId,
                 existingUser
             });
-            
-            if(result.success){
+
+            if (result.success) {
                 updateData.codes = result.codes;
             }
         }
-            
+
 
         // Optional photo update
         if (imageUrl) {
@@ -252,10 +253,10 @@ exports.updateUserAPI = async (req, res, next) => {
 
 
         const roles = Array.isArray(req.body.roles)
-        ? req.body.roles
-        : typeof req.body.roles === 'string'
-        ? req.body.roles.split(',').map(r => r.trim())
-        : [];
+            ? req.body.roles
+            : typeof req.body.roles === 'string'
+                ? req.body.roles.split(',').map(r => r.trim())
+                : [];
 
         // Clear previous roles
         await RoleUser.deleteMany({ user_id: userId });
@@ -280,7 +281,7 @@ exports.updateUserAPI = async (req, res, next) => {
             return errorResponse(res, "User not found", 400);
         }
 
-        return successResponse(res,`${updatedUser.first_name} account changes saved!`, updatedUser);
+        return successResponse(res, `${updatedUser.first_name} account changes saved!`, updatedUser);
     } catch (error) {
         next(error);
     }
@@ -290,7 +291,7 @@ exports.attachNewUserCodeAPI = async (req, res, next) => {
     try {
         const userId = req.params.id; // assuming user ID is passed in URL
         const existingUser = await User.findById(userId);
-  
+
         const updateData = {};
 
         // Handle employee_codes from string
@@ -300,14 +301,14 @@ exports.attachNewUserCodeAPI = async (req, res, next) => {
                 userId,
                 existingUser
             });
-            
-            if(!result.success){
+
+            if (!result.success) {
                 return errorResponse(res, result.message, 400);
-            }else{
+            } else {
                 updateData.codes = result.codes;
             }
         }
-         
+
         updateData.updated_by = req.userId;
         const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
             new: true,
@@ -318,7 +319,7 @@ exports.attachNewUserCodeAPI = async (req, res, next) => {
             return errorResponse(res, "User not found", 400);
         }
 
-        return successResponse(res, "New Employee ID added as Active status.", {codes: updatedUser.codes, emp_id: updatedUser.emp_id });
+        return successResponse(res, "New Employee ID added as Active status.", { codes: updatedUser.codes, emp_id: updatedUser.emp_id });
     } catch (error) {
         next(error);
     }
@@ -326,7 +327,7 @@ exports.attachNewUserCodeAPI = async (req, res, next) => {
 
 exports.markActiveUserCodeAPI = async (req, res, next) => {
     try {
-        
+
         const userId = req.params.id;
         const index = parseInt(req.body.index); // Ensure index is an integer
 
@@ -344,13 +345,13 @@ exports.markActiveUserCodeAPI = async (req, res, next) => {
         existingUser.codes[index].type = 'active';
 
         existingUser.codes = existingUser.codes.map((code, i) => ({
-        ...code,
-        type: i === index ? 'active' : 'inactive'
+            ...code,
+            type: i === index ? 'active' : 'inactive'
         }));
 
         await existingUser.save();
 
-        return successResponse(res, `Employee ID changed for ${existingUser.first_name}`, {codes: existingUser.codes});
+        return successResponse(res, `Employee ID changed for ${existingUser.first_name}`, { codes: existingUser.codes });
     } catch (error) {
         next(error);
     }
@@ -366,7 +367,7 @@ exports.updateStatusAPI = async (req, res, next) => {
         user.status = req.body.status;
         await user.save();
 
-        return successResponse(res, `${user.first_name} account status marked as ${(user.status ? 'Active' : 'Inactive')} `, {current_status: user.status});
+        return successResponse(res, `${user.first_name} account status marked as ${(user.status ? 'Active' : 'Inactive')} `, { current_status: user.status });
     } catch (error) {
         next(error);
     }
@@ -394,7 +395,7 @@ exports.editAPI = async (req, res, next) => {
             //   path: 'role_id', // Assuming RoleUser has `role_id`
             //   model: 'roles'
             // }
-          });
+        });
 
         if (!user) {
             return errorResponse(res, 'User not found!', 400);
@@ -410,7 +411,7 @@ exports.updatePasswordAPI = async (req, res, next) => {
     try {
         const userId = req.params.id; // assuming user ID is passed in URL
         const currentUser = req.userId;
- 
+
         const updateData = {};
         updateData.updated_by = currentUser;
 
@@ -451,7 +452,7 @@ exports.searchUserAPI = async (req, res, next) => {
     try {
         const userId = req.userId;
         const user = await User.findOne({ email_hash: hash(normalizeEmail('alok@gmail.com')) });
-        
+
         return successResponse(res, "Data loaded", user);
     } catch (error) {
         console.error("Error occurred:", error);
@@ -462,7 +463,7 @@ exports.searchUserAPI = async (req, res, next) => {
 exports.importAPI = async (req, res, next) => {
     try {
         const userId = req.userId;
-      
+
         const { chunk, roles } = req.body;
         if (!Array.isArray(chunk)) {
             return errorResponse(res, 'Invalid data format', 400);
