@@ -462,6 +462,7 @@ exports.searchUserAPI = async (req, res, next) => {
 
 exports.importAPI = async (req, res, next) => {
     try {
+
         const userId = req.userId;
 
         const { chunk, roles } = req.body;
@@ -469,6 +470,7 @@ exports.importAPI = async (req, res, next) => {
             return errorResponse(res, 'Invalid data format', 400);
         }
         const response = await userService.importUsers(res, userId, chunk, roles);
+        
         return successResponse(res, "Data loaded", response);
     } catch (error) {
         console.error("Error occurred:", error);

@@ -213,7 +213,9 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
             const bulkUsers = [];
 
             if (schedule_type && schedule_type.length > 0) {
+                
                 for (const item of schedule_type) {
+
                     const type = item.type;
                     const typeId = item.type_id;
                     const scheduleId = item.schedule_id;
@@ -221,23 +223,31 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
                     let ids = [];
 
                     if (type == 1) {
+
                         const userDesignation = await user.find({ designation_id: typeId }).select('_id');
                         ids = userDesignation.map(u => u._id);
+                    
                     } else if (type == 2) {
+                    
                         const userDepartment = await user.find({ department_id: typeId }).select('_id');
                         ids = userDepartment.map(u => u._id);
+                    
                     } else if (type == 3) {
+                    
                         const userGroup = await group.find({ _id: typeId }).select('_id');
                         ids = userGroup.map(g => g._id);
+                    
                     } else if (type == 4) {
+                    
                         const userRegion = await user.find({ region_id: typeId }).select('_id');
                         ids = userRegion.map(u => u._id);
+                    
                     }
 
                     if (ids.length > 0) {
                         ids.forEach(uid => {
                             bulkUsers.push({
-                                schedule_type: type, // ✅ saving type also
+                                schedule_type: type,
                                 schedule_id: scheduleId,
                                 schedule_type_id: typeId,
                                 company_id: userId,
@@ -254,6 +264,7 @@ exports.postProgramScheduleAPI = async (req, res, next) => {
         }
 
         return successResponse(res, "Settings data saved successfully");
+
     } catch (error) {
         console.error("Error in postProgramScheduleAPI:", error);
         next(error);
