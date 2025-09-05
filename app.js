@@ -5,6 +5,7 @@ const flash = require('connect-flash');
 const authRoute = require('./route/auth');
 const adminRoute = require('./route/admin');
 const companyRouter = require('./route/company');
+const userRouter = require('./route/user')
 const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
@@ -47,6 +48,7 @@ app.use('/public', express.static(publicDir));
 app.use('/api/auth', authRoute);
 app.use('/api/admin', adminRoute);
 app.use('/api/company', companyRouter);
+app.use('/api/user', userRouter);
 
 // Simple test route
 app.get('/ping', (req, res) => {
