@@ -26,6 +26,10 @@ exports.getCourseAPIController = async (req, res, next) => {
             _id: { $in: mergedScheduleIds.map(id => new mongoose.Types.ObjectId(id)) }
         });
 
+        // const typeActivityIds = programSchedule.flatMap(item => item.activity_id);
+
+        // const uniqueActivityIds = [...new Set(typeActivityIds.map(id => id.toString()))];
+
         const typeProgramIds = programSchedule.map(item => item.program_id.toString());
 
         // Fetch program with related content_folders

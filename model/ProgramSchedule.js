@@ -24,6 +24,14 @@ const ProgramScheduleSchema = new mongoose.Schema({
     selfEnrollmentSetting: { type: Number, required: true, default: 3 },
     lockModule: { type: Boolean, required: true, default: false },
     dueType: { type: String, enum: ["fixed", "relative"], required: true },
+    program_start_date: {
+        type: Date,
+        required: true
+    },
+    program_end_date: {
+        type: Date,
+        required: true
+    },
     dueDate: { type: String, default: null },
     dueDays: { type: String, default: null },
     created_by: { type: mongoose.Schema.Types.ObjectId, required: true },
